@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="zh-CN" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <th:block th:include="include :: header('涉密载体入册')"/>
+</head>
+<body>
+<form class="layui-form">
+    <div class="mainBox">
+        <div class="main-container">
+            <div class="layui-form-item">
+                <label class="layui-form-label">载体件码</label>
+                <div class="layui-input-block">
+                    <input type="text" name="carrierNo" autocomplete="off" placeholder="涉密载体件码" class="layui-input">
+                </div>
+            </div>
+            <div class="layui-form-item">
+                <label class="layui-form-label">名录代号</label>
+                <div class="layui-input-block">
+                    <input type="text" name="bookNo" autocomplete="off" placeholder="走名录代号文本挂，不填名录主键" class="layui-input">
+                </div>
+            </div>
+            <div class="layui-form-item">
+                <label class="layui-form-label">承办岗</label>
+                <div class="layui-input-block">
+                    <input type="text" name="postNo" autocomplete="off" placeholder="使用岗或承办岗代号" class="layui-input">
+                </div>
+            </div>
+            <div class="layui-form-item">
+                <label class="layui-form-label">应交件数</label>
+                <div class="layui-input-block">
+                    <input type="number" min="0" step="1" name="needNum" autocomplete="off" placeholder="应交件数，不得为空/负数" class="layui-input">
+                </div>
+            </div>
+            <div class="layui-form-item">
+                <label class="layui-form-label">已收件数</label>
+                <div class="layui-input-block">
+                    <input type="number" min="0" step="1" name="gotNum" autocomplete="off" placeholder="已收件数，留空按0；不得冒过应交" class="layui-input">
+                </div>
+            </div>
+            <div class="layui-form-item">
+                <label class="layui-form-label">还差几件</label>
+                <div class="layui-input-block">
+                    <input type="text" readonly style="background:#f2f2f2" value="应交 − 已收，落库时当场轧，不由人填" class="layui-input">
+                </div>
+            </div>
+            <div class="layui-form-item">
+                <label class="layui-form-label">题名与要件</label>
+                <div class="layui-input-block">
+                    <textarea name="content" placeholder="随件交来的载体题名与要件" class="layui-textarea"></textarea>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="bottom">
+        <div class="button-container">
+            <button type="submit" class="layui-btn layui-btn-normal layui-btn-sm" lay-submit="" lay-filter="carrier-save">
+                <i class="layui-icon layui-icon-ok"></i>
+                提交入册
+            </button>
+            <button type="reset" class="layui-btn layui-btn-primary layui-btn-sm">
+                <i class="layui-icon layui-icon-refresh"></i>
+                重置
+            </button>
+        </div>
+    </div>
+</form>
+<th:block th:include="include :: footer"/>
+<script>
+    layui.use(['form', 'jquery'], function () {
+        let form = layui.form;
+        let $ = layui.jquery;
+        let MODULE_PATH = rootPath + "/SecreCarrierController";
+
+        // 差额现场提示：只给人看，提交时服务端仍只认自己当场重轧
+        $('input[name=needNum],input[name=gotNum]').on('input', function () {
+            let need = parseInt($('input[name=needNum]').val(), 10);
+            let got = parseInt($('input[name=gotNum]').val(), 10);
+            let tip = '应交 − 已收，落库时当场轧，不由人填';
+            if (!isNaN(need) && !isNaN(got) && need >= got) {
+                tip = '当场轧出差额：' + (need - got);
+            }
+            $('input[readonly]').val(tip);
+        });
+
+        form.on('submit(carrier-save)', function (data) {
+            $.ajax({
+                url: MODULE_PATH + '/add',
+                data: data.field,
+                dataType: 'json',
+                type: 'post',
+                success: function (result) {
+                    if (result.code === 200) {
+                        layer.msg(result.msg, {icon: 1, time: 1000}, function () {
+                            parent.layer.close(parent.layer.getFrameIndex(window.name));
+                            parent.layui.table.reload("carrier-table");
+                        });
+                    } else {
+                        // 打回必须点到栏位
+                        layer.msg((result.field ? '[' + result.field + '] ' : '') + result.msg, {icon: 2});
+                    }
+                }
+            });
+            return false;
+        });
+    })
+</script>
+</body>
+</html>

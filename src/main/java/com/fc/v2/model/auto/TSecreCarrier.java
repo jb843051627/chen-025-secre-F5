@@ -36,9 +36,9 @@ public class TSecreCarrier implements Serializable {
     @ApiModelProperty(value = "涉密载体件码")
     private String carrierNo;
 
-    /** 挂在哪一册名录名下 */
+    /** 挂在哪一册名录名下（列位保留；挂行一律走 bookNo 文本代号，此主键列不再使用——主键是一长串数字，拿它挂行不作数） */
     @TableField("book_id")
-    @ApiModelProperty(value = "挂在哪一册名录名下")
+    @ApiModelProperty(value = "已弃用：挂行只认名录代号 bookNo")
     private Integer bookId;
 
     /** 名录代号（冗余自名录） */

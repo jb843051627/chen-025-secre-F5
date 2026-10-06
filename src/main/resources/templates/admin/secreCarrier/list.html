@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.pollix.at/thymeleaf/shiro">
+<head>
+    <th:block th:include="include :: header('涉密载体按季对册')"/>
+</head>
+<body class="pear-container">
+<div class="layui-card">
+    <div class="layui-card-body">
+        <form class="layui-form" action="">
+            <div class="layui-form-item">
+                <label class="layui-form-label">季度</label>
+                <div class="layui-input-inline">
+                    <input type="text" name="quarter" placeholder="如 2026Q3，留空当季" class="layui-input">
+                </div>
+                <label class="layui-form-label">名录代号</label>
+                <div class="layui-input-inline">
+                    <input type="text" name="bookNo" placeholder="按名录代号文本查" class="layui-input">
+                </div>
+                <label class="layui-form-label">载体件码</label>
+                <div class="layui-input-inline">
+                    <input type="text" name="carrierNo" placeholder="逐行回查（不按季截断）" class="layui-input">
+                </div>
+                <button class="pear-btn pear-btn-md pear-btn-primary" lay-submit lay-filter="carrier-query">
+                    <i class="layui-icon layui-icon-search"></i>
+                    对册
+                </button>
+                <button type="reset" class="pear-btn pear-btn-md">
+                    <i class="layui-icon layui-icon-refresh"></i>
+                    重置
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+<div class="layui-card">
+    <div class="layui-card-body">
+        <table id="carrier-table" lay-filter="carrier-table"></table>
+    </div>
+</div>
+</body>
+
+<script type="text/html" id="carrier-toolbar">
+    <button shiro:hasPermission="secre:secreCarrier:add" class="pear-btn pear-btn-primary pear-btn-md" lay-event="add">
+        <i class="layui-icon layui-icon-add-1"></i>
+        入册
+    </button>
+</script>
+
+<script type="text/html" id="carrier-bar">
+    <button shiro:hasPermission="secre:secreCarrier:edit" class="pear-btn pear-btn-primary pear-btn-sm" lay-event="edit"><i class="layui-icon layui-icon-edit"></i>
+    </button>
+    <button shiro:hasPermission="secre:secreCarrier:remove" class="pear-btn pear-btn-danger pear-btn-sm" lay-event="remove"><i class="layui-icon layui-icon-delete"></i>
+    </button>
+</script>
+
+<th:block th:include="include :: footer"/>
+<script>
+    layui.use(['table', 'form', 'jquery'], function () {
+        let table = layui.table;
+        let form = layui.form;
+        let $ = layui.jquery;
+
+        let MODULE_PATH = rootPath + "/SecreCarrierController/";
+        let cols = [
+            [
+                {title: 'ID', field: 'id', align: 'center', hide: true},
+                {title: '载体件码', field: 'carrierNo', align: 'center', width: 140},
+                {title: '名录代号', field: 'bookNo', align: 'center', width: 110},
+                {title: '承办岗', field: 'postNo', align: 'center', width: 110},
+                {title: '应交', field: 'needNum', align: 'center', width: 80},
+                {title: '已收', field: 'gotNum', align: 'center', width: 80},
+                {title: '还差（轧出）', field: 'lackNum', align: 'center', width: 110,
+                    templet: function (d) {
+                        // 页面摆出来的数只信库里由同一处账轧回的 lackNum
+                        return '<span style="font-weight:600;color:#c0392b">' + (d.lackNum == null ? '' : d.lackNum) + '</span>';
+                    }},
+                {title: '情形', field: 'status', align: 'center', width: 90,
+                    templet: function (d) {
+                        if (d.status === 1) return '已收齐';
+                        if (d.status === 2) return '缺项';
+                        return '新入册';
+                    }},
+                {title: '题名与要件', field: 'content', align: 'center'},
+                {title: '操作', toolbar: '#carrier-bar', align: 'center', width: 120}
+            ]
+        ];
+
+        table.render({
+            elem: '#carrier-table',
+            url: MODULE_PATH + 'screen',
+            page: true,
+            method: 'get',
+            cols: cols,
+            skin: 'line',
+            toolbar: '#carrier-toolbar',
+            defaultToolbar: ['refresh', 'filter', 'print', 'exports'],
+            where: {
+                quarter: ''
+            }
+        });
+
+        table.on('tool(carrier-table)', function (obj) {
+            if (obj.event === 'remove') {
+                window.remove(obj);
+            } else if (obj.event === 'edit') {
+                window.edit(obj);
+            }
+        });
+
+        table.on('toolbar(carrier-table)', function (obj) {
+            if (obj.event === 'add') {
+                window.add();
+            } else if (obj.event === 'refresh') {
+                table.reload('carrier-table');
+            }
+        });
+
+        form.on('submit(carrier-query)', function (data) {
+            table.reload('carrier-table', {where: data.field, page: {curr: 1}});
+            return false;
+        });
+
+        window.add = function () {
+            layer.open({
+                type: 2,
+                title: '涉密载体入册',
+                shade: 0.1,
+                area: ['620px', '600px'],
+                content: MODULE_PATH + 'add'
+            });
+        };
+        window.edit = function (obj) {
+            layer.open({
+                type: 2,
+                title: '改口（已收／换名录）',
+                shade: 0.1,
+                area: ['620px', '600px'],
+                content: MODULE_PATH + 'edit/' + obj.data['id']
+            });
+        };
+        window.remove = function (obj) {
+            layer.confirm('确定要删除该行', {icon: 3, title: '提示'}, function (index) {
+                layer.close(index);
+                let loading = layer.load();
+                $.ajax({
+                    url: MODULE_PATH + "remove?ids=" + obj.data['id'],
+                    dataType: 'json',
+                    type: 'delete',
+                    success: function (result) {
+                        layer.close(loading);
+                        if (result.code === 200) {
+                            layer.msg(result.msg, {icon: 1, time: 1000}, function () {
+                                obj.del();
+                            });
+                        } else {
+                            layer.msg((result.field ? '[' + result.field + '] ' : '') + result.msg, {icon: 2});
+                        }
+                    }
+                })
+            });
+        };
+    })
+</script>
+</html>

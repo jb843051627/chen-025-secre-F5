@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="zh-CN" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <th:block th:include="include :: header('载体行改口')"/>
+</head>
+<body>
+<div th:if="${carrier == null}" class="pear-container" style="padding:20px">
+    <div class="layui-bg-gray" style="padding:16px">这一行在本屏册面上寻不着（可能不在本级属地/知悉范围内）。</div>
+</div>
+<form class="layui-form" th:if="${carrier != null}" th:object="${carrier}">
+    <input type="hidden" name="id" th:value="*{id}">
+    <div class="mainBox">
+        <div class="main-container">
+            <div class="layui-form-item">
+                <label class="layui-form-label">载体件码</label>
+                <div class="layui-input-block">
+                    <input type="text" th:value="*{carrierNo}" name="carrierNo" autocomplete="off" class="layui-input">
+                </div>
+            </div>
+            <div class="layui-form-item">
+                <label class="layui-form-label">名录代号</label>
+                <div class="layui-input-block">
+                    <input type="text" th:value="*{bookNo}" name="bookNo" autocomplete="off"
+                           placeholder="换挂靠名录只认代号文本；不换就保持原样" class="layui-input">
+                </div>
+            </div>
+            <div class="layui-form-item">
+                <label class="layui-form-label">承办岗</label>
+                <div class="layui-input-block">
+                    <input type="text" th:value="*{postNo}" name="postNo" autocomplete="off" class="layui-input">
+                </div>
+            </div>
+            <div class="layui-form-item">
+                <label class="layui-form-label">应交件数</label>
+                <div class="layui-input-block">
+                    <input type="number" min="0" step="1" th:value="*{needNum}" name="needNum" autocomplete="off" class="layui-input">
+                </div>
+            </div>
+            <div class="layui-form-item">
+                <label class="layui-form-label">已收件数</label>
+                <div class="layui-input-block">
+                    <input type="number" min="0" step="1" th:value="*{gotNum}" name="gotNum" autocomplete="off" class="layui-input">
+                </div>
+            </div>
+            <div class="layui-form-item">
+                <label class="layui-form-label">还差几件</label>
+                <div class="layui-input-block">
+                    <input type="text" readonly style="background:#f2f2f2" th:value="'库里同一处账轧回：' + *{lackNum}" class="layui-input">
+                </div>
+            </div>
+            <div class="layui-form-item">
+                <label class="layui-form-label">题名与要件</label>
+                <div class="layui-input-block">
+                    <textarea name="content" class="layui-textarea" th:text="*{content}"></textarea>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="bottom">
+        <div class="button-container">
+            <button type="submit" class="layui-btn layui-btn-normal layui-btn-sm" lay-submit="" lay-filter="carrier-edit">
+                <i class="layui-icon layui-icon-ok"></i>
+                改口保存
+            </button>
+        </div>
+    </div>
+</form>
+<th:block th:include="include :: footer"/>
+<script th:if="${carrier != null}">
+    layui.use(['form', 'jquery'], function () {
+        let form = layui.form;
+        let $ = layui.jquery;
+        let MODULE_PATH = rootPath + "/SecreCarrierController";
+
+        // 改口后页面摆出来的数与落库回轧的数同一处算：这里只预览，提交后服务端重轧
+        $('input[name=needNum],input[name=gotNum]').on('input', function () {
+            let need = parseInt($('input[name=needNum]').val(), 10);
+            let got = parseInt($('input[name=gotNum]').val(), 10);
+            let tip = '保存时按本行两个数当场重轧';
+            if (!isNaN(need) && !isNaN(got)) {
+                if (got > need) {
+                    tip = '已收冒过应交，这一行立不起来';
+                } else {
+                    tip = '当场轧出差额：' + (need - got);
+                }
+            }
+            $('input[readonly]').val(tip);
+        });
+
+        form.on('submit(carrier-edit)', function (data) {
+            $.ajax({
+                url: MODULE_PATH + '/edit',
+                data: data.field,
+                dataType: 'json',
+                type: 'post',
+                success: function (result) {
+                    if (result.code === 200) {
+                        layer.msg(result.msg, {icon: 1, time: 1000}, function () {
+                            parent.layer.close(parent.layer.getFrameIndex(window.name));
+                            parent.layui.table.reload("carrier-table");
+                        });
+                    } else {
+                        layer.msg((result.field ? '[' + result.field + '] ' : '') + result.msg, {icon: 2});
+                    }
+                }
+            });
+            return false;
+        });
+    })
+</script>
+</body>
+</html>

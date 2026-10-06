@@ -2,6 +2,7 @@ package com.fc.v2.common.exception;
 
 import com.fc.v2.common.domain.AjaxResult;
 import com.fc.v2.common.exception.demo.DemoModeException;
+import com.fc.v2.service.secre.SecreLedgerException;
 import com.fc.v2.util.ServletUtils;
 import org.apache.shiro.authz.AuthorizationException;
 import org.apache.shiro.authz.UnauthenticatedException;
@@ -100,6 +101,18 @@ public class GlobalExceptionResolver{
 	    return mv; 
     }
     
+    /**
+     * 入册立账被打回：按栏位点名（只丢「数不对劲」不算交代）
+     */
+    @ExceptionHandler(SecreLedgerException.class)
+    public AjaxResult secreLedgerException(SecreLedgerException e)
+    {
+        logger.warn("入册立账打回，栏位 {}：{}", e.getField(), e.getMessage());
+        AjaxResult result = AjaxResult.error(e.getMessage());
+        result.put("field", e.getField());
+        return result;
+    }
+
     /**
      * 演示模式异常
      */

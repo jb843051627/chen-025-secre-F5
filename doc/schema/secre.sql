@@ -127,6 +127,56 @@ CREATE TABLE IF NOT EXISTS t_secre_warn_line (
   PRIMARY KEY (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='届期预警分级线';
 
+-- 知悉范围配置：把一屏划给某个用户（scope_type 0=本级经办岗 1=市保密办）。
+-- 本级经办岗按属地（road_name 一直写到街道）见行；市保密办按 t_secre_scope_book 点名划给它的那几家。
+CREATE TABLE IF NOT EXISTS t_secre_user_scope (
+  id bigint NOT NULL COMMENT '主键',
+  user_id bigint DEFAULT NULL COMMENT '划给谁（t_sys_user.id）',
+  scope_type int DEFAULT 0 COMMENT '屏别 0本级经办岗 1市保密办',
+  road_name varchar(128) DEFAULT NULL COMMENT '本级属地（一直写到街道，本级经办岗按此见行）',
+  del_flag int DEFAULT '0' COMMENT '删除标记 0正常 1删除',
+  create_by varchar(64) DEFAULT NULL COMMENT '创建者',
+  create_time datetime DEFAULT NULL COMMENT '创建时间',
+  update_by varchar(64) DEFAULT NULL COMMENT '更新者',
+  update_time datetime DEFAULT NULL COMMENT '更新时间',
+  remark varchar(500) DEFAULT NULL COMMENT '备注',
+  PRIMARY KEY (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='涉密载体知悉范围配置';
+
+-- 市保密办那一屏被点名划到的名录代号（只看得见这几家；本级经办岗不用此表，按属地见行）
+CREATE TABLE IF NOT EXISTS t_secre_scope_book (
+  id bigint NOT NULL COMMENT '主键',
+  scope_id bigint DEFAULT NULL COMMENT '知悉范围配置id',
+  book_no varchar(64) DEFAULT NULL COMMENT '划给它的名录代号（走代号文本，不走主键）',
+  del_flag int DEFAULT '0' COMMENT '删除标记 0正常 1删除',
+  create_by varchar(64) DEFAULT NULL COMMENT '创建者',
+  create_time datetime DEFAULT NULL COMMENT '创建时间',
+  update_by varchar(64) DEFAULT NULL COMMENT '更新者',
+  update_time datetime DEFAULT NULL COMMENT '更新时间',
+  remark varchar(500) DEFAULT NULL COMMENT '备注',
+  PRIMARY KEY (id),
+  KEY idx_scope_book_scope (scope_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='知悉范围点名名录';
+
+-- 上级下发名录与本机关自录名录的冲突台账：同代号两份对不上时逐条点名，不许悄悄盖掉
+CREATE TABLE IF NOT EXISTS t_secre_org_sync_conflict (
+  id bigint NOT NULL COMMENT '主键',
+  book_no varchar(64) DEFAULT NULL COMMENT '起冲突的名录代号',
+  upper_book_name varchar(128) DEFAULT NULL COMMENT '上级那份的单位全称',
+  local_book_name varchar(128) DEFAULT NULL COMMENT '本机关自录那份的单位全称',
+  upper_status int DEFAULT NULL COMMENT '上级那份名录情形 0在册 1已撤号',
+  local_status int DEFAULT NULL COMMENT '本机关那份名录情形 0在册 1已撤出',
+  reason varchar(500) DEFAULT NULL COMMENT '冲突缘由与裁定（以本机关自录为准）',
+  del_flag int DEFAULT '0' COMMENT '删除标记 0正常 1删除',
+  create_by varchar(64) DEFAULT NULL COMMENT '创建者',
+  create_time datetime DEFAULT NULL COMMENT '创建时间',
+  update_by varchar(64) DEFAULT NULL COMMENT '更新者',
+  update_time datetime DEFAULT NULL COMMENT '更新时间',
+  remark varchar(500) DEFAULT NULL COMMENT '备注',
+  PRIMARY KEY (id),
+  KEY idx_org_conflict_no (book_no)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='名录上下发冲突台账';
+
 -- 初始档案数据（id=1 启用 / id=2 停用）
 -- t_secre_org_book 两条种子名录：book_id=0 在册、book_id=1 已撤出（供后续挂接与挡新入册
 -- 判定项取用）。名录代号与类别按「三类各排各的序」的说法给值。
@@ -134,3 +184,35 @@ INSERT IGNORE INTO t_secre_org_book (id, book_no, book_name, book_kind, road_nam
 VALUES (0, 'ML00', '浔州区谷城街道·中共谷城市委机关（机关类，在册）', '机关', '浔州省—谷城市—浔州区—谷城街道', 0, 0, 'seed', NOW()),
        (1, 'ML01', '北塔区岭南区·市测绘院下属资料室（已并走撤出）', '事业单位', '浔州省—谷城市—北塔区—岭南街道', 1, 0, 'seed', NOW());
 
+-- 知悉范围种子：admin 划市保密办一屏（点名 ML00/ML01，撤出的 ML01 旧账照样列得出来）；
+-- fuce 划本级经办岗一屏，属地到谷城街道，只看得见挂在本街道名下行。
+INSERT IGNORE INTO t_secre_user_scope (id, user_id, scope_type, road_name, del_flag, create_by, create_time)
+VALUES (100, 1, 1, NULL, 0, 'seed', NOW()),
+       (101, 433236479427350528, 0, '浔州省—谷城市—浔州区—谷城街道', 0, 'seed', NOW());
+
+INSERT IGNORE INTO t_secre_scope_book (id, scope_id, book_no, del_flag, create_by, create_time)
+VALUES (200, 100, 'ML00', 0, 'seed', NOW()),
+       (201, 100, 'ML01', 0, 'seed', NOW());
+
+
+-- 菜单与权限种子（挂在系统管理 592059865673760768 下；INSERT IGNORE，已存在不动）
+INSERT IGNORE INTO t_sys_permission (id, name, descripion, url, is_blank, pid, perms, type, icon, order_num, visible, create_by, create_time)
+VALUES (9001, '涉密载体按季对册', '涉密载体册面对册屏', '/SecreCarrierController/view', 0, 592059865673760768, 'secre:secreCarrier:view', 1, 'layui-icon layui-icon-list', 50, 0, 'seed', NOW()),
+       (9002, '涉密载体集合', '按季+知悉范围列行', '/SecreCarrierController/screen', 0, 9001, 'secre:secreCarrier:list', 2, '', 50, 0, 'seed', NOW()),
+       (9003, '涉密载体入册', '入册（差额当场轧）', '/SecreCarrierController/add', 0, 9001, 'secre:secreCarrier:add', 2, 'layui-icon layui-icon-add-1', 50, 0, 'seed', NOW()),
+       (9004, '涉密载体改口', '已收/换名录改口重轧', '/SecreCarrierController/edit', 0, 9001, 'secre:secreCarrier:edit', 2, 'layui-icon layui-icon-edit', 50, 0, 'seed', NOW()),
+       (9005, '涉密载体删除', '删除本屏行', '/SecreCarrierController/remove', 0, 9001, 'secre:secreCarrier:remove', 2, 'layui-icon layui-icon-delete', 50, 0, 'seed', NOW()),
+       (9011, '机构名录底册', '名录自录与上级对账', '/SecreOrgBookController/list', 0, 592059865673760768, 'secre:secreOrgBook:list', 1, 'layui-icon layui-icon-template-1', 51, 0, 'seed', NOW()),
+       (9012, '机构名录自录', '本机关自录名录', '/SecreOrgBookController/saveLocal', 0, 9011, 'secre:secreOrgBook:edit', 2, '', 51, 0, 'seed', NOW()),
+       (9013, '上级名录对账', '每日上级下发对账，冲突点代号', '/SecreOrgBookController/reconcileUpper', 0, 9011, 'secre:secreOrgBook:sync', 2, '', 51, 0, 'seed', NOW());
+
+-- 划给管理员角色（488243256161730560）
+INSERT IGNORE INTO t_sys_permission_role (id, role_id, permission_id, create_by, create_time)
+VALUES (9101, 488243256161730560, 9001, 'seed', NOW()),
+       (9102, 488243256161730560, 9002, 'seed', NOW()),
+       (9103, 488243256161730560, 9003, 'seed', NOW()),
+       (9104, 488243256161730560, 9004, 'seed', NOW()),
+       (9105, 488243256161730560, 9005, 'seed', NOW()),
+       (9111, 488243256161730560, 9011, 'seed', NOW()),
+       (9112, 488243256161730560, 9012, 'seed', NOW()),
+       (9113, 488243256161730560, 9013, 'seed', NOW());
